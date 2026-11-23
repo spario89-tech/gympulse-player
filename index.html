@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#020617">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="GymPulse Member">
+    <title>بطاقة المشترك الذكية - GymPulse</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%2310b981'/%3E%3Ctext x='50' y='68' font-size='54' font-weight='900' font-family='Arial' text-anchor='middle' fill='%23020617'%3EG%3C/text%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%2310b981'/%3E%3Ctext x='50' y='68' font-size='54' font-weight='900' font-family='Arial' text-anchor='middle' fill='%23020617'%3EG%3C/text%3E%3C/svg%3E">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
+        body { font-family: 'Cairo', sans-serif; background-color: #020617; background-image: radial-gradient(circle at top, rgba(16, 185, 129, 0.14), transparent 50%); }
+        .glass { background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.08); }
+    </style>
+</head>
+<body class="text-white min-h-screen p-4 flex items-center justify-center">
+
+    <!-- شاشة تسجيل دخول اللاعب لأول مرة -->
+    <div id="member-setup-screen" class="hidden max-w-sm w-full glass p-7 rounded-3xl space-y-5 text-center shadow-2xl">
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-slate-950 font-black text-3xl mx-auto shadow-lg">G</div>
+        <div>
+            <h1 class="text-xl font-black text-white">تفعيل بطاقة المشترك</h1>
+            <p class="text-xs text-slate-400 mt-1">أدخل رمز الصالة ورقم موبايلك المسجل في الاستقبال</p>
+        </div>
+        <div class="space-y-3 text-right text-xs">
+            <div>
+                <label class="text-slate-300 font-bold">رمز الصالة (Gym ID):</label>
+                <input type="text" id="mem-gym-id-input" placeholder="مثال: onada_gym" style="direction: ltr;" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 mt-1 font-mono text-emerald-400 outline-none focus:border-emerald-500">
+            </div>
+            <div>
+                <label class="text-slate-300 font-bold">رقم الموبايل المسجل بالصالة:</label>
+                <input type="tel" id="mem-phone-input" onkeydown="if(event.key==='Enter') activateMemberCard()" placeholder="0999123456" style="direction: ltr;" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 mt-1 font-mono text-white outline-none focus:border-emerald-500">
+            </div>
+        </div>
+        <button onclick="activateMemberCard()" id="btn-mem-login" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-3.5 rounded-2xl text-sm transition">
+            تفعيل البطاقة الذكية 📲
+        </button>
+    </div>
+
+    <!-- بطاقة دخول واشتراك اللاعب -->
+    <div id="member-card-screen" class="hidden max-w-sm w-full glass p-6 rounded-3xl space-y-5 text-center shadow-2xl">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+            <div class="text-right">
+                <p id="card-gym-name" class="text-xs font-black text-emerald-400">GYMPULSE PRO</p>
+                <h2 id="card-mem-name" class="text-lg font-black text-white mt-0.5">---</h2>
+            </div>
+            <button onclick="resetMemberAccount()" class="text-[11px] bg-slate-900 hover:bg-slate-800 text-slate-400 px-3 py-1.5 rounded-xl border border-slate-800">خروج</button>
+        </div>
+
+        <!-- صندوق كود QR المتجدد كل دقيقة -->
+        <div class="bg-white p-4 rounded-3xl inline-block mx-auto shadow-xl">
+            <div id="qrcode-box"></div>
+        </div>
+
+        <div class="space-y-1">
+            <p class="text-xs font-bold text-emerald-400">امسح الكود عند بوابة الاستقبال للدخول</p>
+            <p class="text-[11px] text-slate-400 font-mono">يتجدد رمز الأمان تلقائياً خلال: <span id="qr-timer" class="text-amber-400 font-black">60</span> ثانية</p>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2.5 text-center pt-1">
+            <div class="bg-slate-950/90 p-3 rounded-2xl border border-slate-800">
+                <p class="text-[10px] text-slate-400">رقم الموبايل</p>
+                <p id="card-phone" class="text-xs font-mono font-bold text-white mt-1">---</p>
+            </div>
+            <div class="bg-slate-950/90 p-3 rounded-2xl border border-slate-800">
+                <p class="text-[10px] text-slate-400">انتهاء الاشتراك</p>
+                <p id="card-end-date" class="text-xs font-mono font-bold text-amber-300 mt-1">---</p>
+            </div>
+            <div class="bg-slate-950/90 p-3 rounded-2xl border border-slate-800">
+                <p class="text-[10px] text-slate-400">الذمة المالية</p>
+                <p id="card-debt" class="text-xs font-black text-rose-400 mt-1">0</p>
+            </div>
+        </div>
+
+        <button onclick="refreshMemberSubscription()" class="w-full bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-emerald-500/30 font-bold py-3 rounded-2xl text-xs transition">
+            🔄 تحديث حالة الاشتراك
+        </button>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://sxjtqjyyrqwevtmlwfwh.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4anRxanl5cnF3ZXZ0bWx3ZndoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzNTUzMzcsImV4cCI6MjEwODkzMTMzN30.IbXuDbXwDTxnln6Ur1Z97tcv3YT7qPz3zdrPj8WCDVQ";
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let qrInterval = null;
+        let lastWindow = -1;
+
+        function initMemberApp() {
+            const savedGym = localStorage.getItem('mem_gym_id');
+            const savedPhone = localStorage.getItem('mem_phone');
+
+            if (!savedGym || !savedPhone) {
+                document.getElementById('member-setup-screen').classList.remove('hidden');
+                document.getElementById('member-card-screen').classList.add('hidden');
+            } else {
+                document.getElementById('member-setup-screen').classList.add('hidden');
+                document.getElementById('member-card-screen').classList.remove('hidden');
+                document.getElementById('card-gym-name').innerText = localStorage.getItem('mem_gym_name') || savedGym;
+                document.getElementById('card-mem-name').innerText = localStorage.getItem('mem_full_name') || 'مشترك';
+                document.getElementById('card-phone').innerText = savedPhone;
+                startDynamicQR(savedGym, savedPhone);
+                refreshMemberSubscription();
+            }
+        }
+
+        async function activateMemberCard() {
+            const gymId = document.getElementById('mem-gym-id-input').value.trim().toLowerCase().replace(/\s+/g, '_');
+            const phone = document.getElementById('mem-phone-input').value.trim();
+
+            if (!gymId || !phone) return alert("يرجى إدخال رمز الصالة ورقم الموبايل!");
+
+            const btn = document.getElementById('btn-mem-login');
+            btn.innerText = "⏳ جاري التحقق من السجل...";
+
+            const { data: gym } = await supabaseClient.from('gyms_registry').select('gym_name, is_active').eq('gym_id', gymId).maybeSingle();
+            if (!gym) {
+                btn.innerText = "تفعيل البطاقة الذكية 📲";
+                return alert("❌ رمز الصالة غير صحيح!");
+            }
+
+            const { data: mem } = await supabaseClient.from('members').select('id, full_name, phone').eq('gym_id', gymId).eq('phone', phone).maybeSingle();
+            if (!mem) {
+                btn.innerText = "تفعيل البطاقة الذكية 📲";
+                return alert("❌ رقم الموبايل غير مسجل في هذه الصالة! تأكد من تسجيلك عند الاستقبال أولاً.");
+            }
+
+            localStorage.setItem('mem_gym_id', gymId);
+            localStorage.setItem('mem_gym_name', gym.gym_name);
+            localStorage.setItem('mem_phone', mem.phone);
+            localStorage.setItem('mem_full_name', mem.full_name);
+            localStorage.setItem('mem_uuid', mem.id);
+
+            initMemberApp();
+        }
+
+        async function refreshMemberSubscription() {
+            const gymId = localStorage.getItem('mem_gym_id');
+            const phone = localStorage.getItem('mem_phone');
+            if (!gymId || !phone) return;
+
+            try {
+                const { data: mem } = await supabaseClient.from('members').select('id, full_name').eq('gym_id', gymId).eq('phone', phone).maybeSingle();
+                if (mem) {
+                    document.getElementById('card-mem-name').innerText = mem.full_name;
+                    const { data: subs } = await supabaseClient
+                        .from('subscriptions')
+                        .select('end_date, remaining_amount')
+                        .eq('gym_id', gymId)
+                        .eq('member_id', mem.id)
+                        .order('created_at', { ascending: false })
+                        .limit(1);
+
+                    if (subs && subs.length > 0) {
+                        document.getElementById('card-end-date').innerText = subs[0].end_date || '---';
+                        document.getElementById('card-debt').innerText = Number(subs[0].remaining_amount || 0).toLocaleString();
+                    }
+                }
+            } catch (e) {}
+        }
+
+        function startDynamicQR(gymId, phone) {
+            if (qrInterval) clearInterval(qrInterval);
+
+            const updateQR = () => {
+                const nowSec = Math.floor(Date.now() / 1000);
+                const currentWindow = Math.floor(nowSec / 60);
+                const remaining = 60 - (nowSec % 60);
+                document.getElementById('qr-timer').innerText = remaining;
+
+                if (currentWindow !== lastWindow) {
+                    lastWindow = currentWindow;
+                    const token = `GYM_TOTP:${gymId}:${phone}:${currentWindow}`;
+                    const box = document.getElementById('qrcode-box');
+                    box.innerHTML = "";
+                    new QRCode(box, { text: token, width: 200, height: 200, colorDark: "#020617", colorLight: "#ffffff" });
+                }
+            };
+
+            updateQR();
+            qrInterval = setInterval(updateQR, 1000);
+        }
+
+        function resetMemberAccount() {
+            if (!confirm("هل تريد تسجيل الخروج من هذه البطاقة؟")) return;
+            localStorage.removeItem('mem_gym_id');
+            localStorage.removeItem('mem_phone');
+            location.reload();
+        }
+
+        window.onload = initMemberApp;
+    </script>
+</body>
+</html>

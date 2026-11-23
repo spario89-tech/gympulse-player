@@ -104,6 +104,8 @@
                 document.getElementById('card-gym-name').innerText = localStorage.getItem('mem_gym_name') || savedGym;
                 document.getElementById('card-mem-name').innerText = localStorage.getItem('mem_full_name') || 'مشترك';
                 document.getElementById('card-phone').innerText = savedPhone;
+                document.getElementById('card-end-date').innerText = localStorage.getItem('mem_end_date') || '---';
+                document.getElementById('card-debt').innerText = localStorage.getItem('mem_debt') || '0';
                 startDynamicQR(savedGym, savedPhone);
                 refreshMemberSubscription();
             }
@@ -148,6 +150,8 @@
                 const { data: mem } = await supabaseClient.from('members').select('id, full_name').eq('gym_id', gymId).eq('phone', phone).maybeSingle();
                 if (mem) {
                     document.getElementById('card-mem-name').innerText = mem.full_name;
+                    localStorage.setItem('mem_full_name', mem.full_name);
+
                     const { data: subs } = await supabaseClient
                         .from('subscriptions')
                         .select('end_date, remaining_amount')
@@ -157,8 +161,12 @@
                         .limit(1);
 
                     if (subs && subs.length > 0) {
-                        document.getElementById('card-end-date').innerText = subs[0].end_date || '---';
-                        document.getElementById('card-debt').innerText = Number(subs[0].remaining_amount || 0).toLocaleString();
+                        const endStr = subs[0].end_date || '---';
+                        const debtStr = Number(subs[0].remaining_amount || 0).toLocaleString();
+                        document.getElementById('card-end-date').innerText = endStr;
+                        document.getElementById('card-debt').innerText = debtStr;
+                        localStorage.setItem('mem_end_date', endStr);
+                        localStorage.setItem('mem_debt', debtStr);
                     }
                 }
             } catch (e) {}
@@ -190,7 +198,13 @@
             if (!confirm("هل تريد تسجيل الخروج من هذه البطاقة؟")) return;
             localStorage.removeItem('mem_gym_id');
             localStorage.removeItem('mem_phone');
+            localStorage.removeItem('mem_end_date');
+            localStorage.removeItem('mem_debt');
             location.reload();
+        }
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js').catch(() => {});
         }
 
         window.onload = initMemberApp;
